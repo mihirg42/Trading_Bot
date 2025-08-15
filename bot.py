@@ -20,6 +20,7 @@ def check_account_ok(api):
     except Exception as e:
         lg.error('Could not get account info, aborting')
         lg.info(str(e))
+        # to terminate python code
         sys.exit()
 
 # close current orders
@@ -69,11 +70,12 @@ def main():
     clean_open_orders(api)
 
     # get ticker
-    #ticker = input('Write the ticker you want to operate with: ')
-    ticker = 'AAPL'
+    ticker = input("Write the ticker you want to operate with: ")
+    # ticker = 'AAPL'
 
     check_asset_ok(api,ticker)
 
+    #Trader class defined in traderlib.py
     trader = Trader(ticker,api) # initialize trading bot
 
     while True:

@@ -33,7 +33,7 @@ class Trader:
                 lg.info('The ticker %s is tradable!' % ticker)
                 return True
         except:
-            lg.error('The ticker %s is not ansering well' % ticker)
+            lg.error('The ticker %s is not answering well' % ticker)
             return False
 
     def set_stoploss(self,entryPrice,trend):
@@ -44,6 +44,7 @@ class Trader:
         try:
             if trend == 'long':
                 # example: 10 - (10*0.05) = 9.5
+                # gvars.py is a python file
                 stopLoss = entryPrice - (entryPrice * gvars.stopLossMargin)
                 lg.info('Stop loss set for long at %.2f' % stopLoss)
                 return stopLoss
@@ -129,17 +130,17 @@ class Trader:
 
         return data
 
-    def get_open_positions(self,assetId):
-        # get open positions
-            # IN: assetId (unique identifier)
-            # OUT: boolean (True = already open, False = not open)
-
-        # positions = ask alpaca wrapper for the list of open positions
-        for position in positions:
-            if position.symbol == assetId:
-                return True
-            else:
-                return False
+    # def get_open_positions(self,assetId):
+    #     # get open positions
+    #         # IN: assetId (unique identifier)
+    #         # OUT: boolean (True = already open, False = not open)
+    #
+    #     # positions = ask alpaca wrapper for the list of open positions
+    #     for position in positions:
+    #         if position.symbol == assetId:
+    #             return True
+    #         else:
+    #             return False
 
     def submit_order(self,type,trend,ticker,sharesQty,currentPrice,exit=False):
         # IN: order data (number of shares, order type)
@@ -227,7 +228,7 @@ class Trader:
             # IN: ticker, doNotFind (means that I dont want to find)
             # OUT: boolean (True = order is there, False = order not there)
         attempt = 1
-        time.sleep(gvars.sleepTimeCP)
+        # time.sleep(gvars.sleepTimeCP)
 
         while attempt <= gvars.maxAttemptsCP:
             try:
@@ -334,6 +335,7 @@ class Trader:
                 data = self.load_historical_data(ticker,interval=30,limit=50)
 
                 # calculate the EMAs
+                # closing price of stock
                 ema9 = ti.ema(data.close.to_numpy(),9)[-1]
                 ema26 = ti.ema(data.close.to_numpy(),26)[-1]
                 ema50 = ti.ema(data.close.to_numpy(),50)[-1]
@@ -361,7 +363,7 @@ class Trader:
             sys.exit()
 
     def get_instant_trend(self,ticker,trend):
-        # get instat trend: confirm the trend detected by GT analysis
+        # get instant trend: confirm the trend detected by GT analysis
             # IN: ticker, trend (long / short)
             # OUT: True (trend confirmed) / False (not a good moment to enter)
 
@@ -374,6 +376,7 @@ class Trader:
                 data = self.load_historical_data(ticker,interval=5,limit=50)
 
                 # calculate the EMAs
+                # closing price of stock
                 ema9 = ti.ema(data.close.to_numpy(),9)[-1]
                 ema26 = ti.ema(data.close.to_numpy(),26)[-1]
                 ema50 = ti.ema(data.close.to_numpy(),50)[-1]
@@ -413,6 +416,7 @@ class Trader:
                 data = self.load_historical_data(ticker,interval=5,limit=15)
 
                 # calculate the RSI
+                # closing price of stock
                 rsi = ti.rsi(data.close.to_numpy(), 14)[-1] # it uses 14-sample window
 
                 lg.info('%s rsi = [%.2f]' % (ticker,rsi))
@@ -450,6 +454,7 @@ class Trader:
                 data = self.load_historical_data(ticker,interval=5,limit=50)
 
                 # calculate the STOCHASTIC
+                # highest, lowest, closing price of stock
                 stoch_k, stoch_d = ti.stoch(data.high.to_numpy(), data.low.to_numpy(), data.close.to_numpy(), 9, 6, 9)
                 stoch_k = stoch_k[-1]
                 stoch_d = stoch_d[-1]
@@ -544,7 +549,7 @@ class Trader:
                     return False
 
                 # SHORT/DOWN version
-                elif (trend == 'short') and (self.currentPrice <= stopLoss):
+                elif (trend == 'short') and (self.currentPrice >= stopLoss):
                     lg.info('Stop loss met at %.2f. Current price is %.2f' % (stoploss,self.currentPrice))
                     return False
 
@@ -572,7 +577,6 @@ class Trader:
 
     def run(self,ticker):
 
-        #POINT DELTA: LOOP until timeout reached (ex. 2h)
         while True:
 
             # POINT ECHO
