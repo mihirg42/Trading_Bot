@@ -5,6 +5,7 @@
 import sys, os, time, pytz
 import tulipy as ti
 import pandas as pd
+import yfinance as yf
 from logger import *
 import gvars
 
@@ -36,8 +37,8 @@ class Trader:
             lg.error('The ticker %s is not answering well' % ticker)
             return False
 
-    def set_stoploss(self,entryPrice,trend):
-        # takes an entry price and sets the stoploss (trend)
+    def set_stop_loss(self,entryPrice,trend):
+        # takes an entry price and sets the stop_loss (trend)
             # IN: entry price, trend (long/short)
             # OUT: stop loss ($)
 
@@ -45,14 +46,14 @@ class Trader:
             if trend == 'long':
                 # example: 10 - (10*0.05) = 9.5
                 # gvars.py is a python file
-                stopLoss = entryPrice - (entryPrice * gvars.stopLossMargin)
-                lg.info('Stop loss set for long at %.2f' % stopLoss)
-                return stopLoss
+                stop_loss = entryPrice - (entryPrice * gvars.stop_lossMargin)
+                lg.info('Stop loss set for long at %.2f' % stop_loss)
+                return stop_loss
             elif trend == 'short':
                 # example: 10 + (10*0.05) = 10.5
-                stopLoss = entryPrice + (entryPrice * gvars.stopLossMargin)
-                lg.info('Stop loss set for long at %.2f' % stopLoss)
-                return stopLoss
+                stop_loss = entryPrice + (entryPrice * gvars.stop_lossMargin)
+                lg.info('Stop loss set for long at %.2f' % stop_loss)
+                return stop_loss
             else:
                 raise ValueError
 
@@ -83,20 +84,14 @@ class Trader:
             lg.error('The trend value is not understood: %s' % str(trend))
             sys.exit()
 
-    def load_historical_data(self,ticker,interval,limit):
+    def load_historical_data(self,ticker,interval,period):
         # load historical stock data
             # IN: ticker, interval (aggregation), api, entries limit
             # OUT: array with stock data (OHCL)
 
-        timeNow = datetime.now(pytz.timezone('US/Eastern'))
-        timeStart = timeNow - timedelta(minutes=interval*limit)
-
         try:
-            data = self.api.get_bars(ticker, TimeFrame(interval,TimeFrameUnit.Minute),
-                             start=timeStart.isoformat(),
-                             end=timeNow.isoformat(),
-                             limit=limit
-                             ).df
+            ticker = yf.Ticker(ticker)
+            data = ticker.history(interval,period)
 
         except Exception as e:
             lg.error('Something happened while loading historical data')
@@ -105,30 +100,30 @@ class Trader:
 
         return data
 
-    def load_historical_data_deprecated(self,ticker,interval,limit):
-        # load historical stock data
-            # IN: ticker, interval (aggregation), api, entries limit
-            # OUT: array with stock data (OHCL)
-
-        try:
-            if interval == '30Min':
-                dataRaw = self.api.get_barset(ticker,'5Min',limit*6).df[ticker]
-                data = dataRaw.resample('30min').agg({
-                                            'open':'first',
-                                            'high':'max',
-                                            'low':'min',
-                                            'close':'last',
-                                            'volume':'sum'
-                                            })
-                data = data.dropna()
-            else:
-                data = self.api.get_barset(ticker,interval,limit).df[ticker]
-        except Exception as e:
-            lg.error('Something happened while loading historical data')
-            lg.error(e)
-            sys.exit()
-
-        return data
+    # def load_historical_data_deprecated(self,ticker,interval,limit):
+    #     # load historical stock data
+    #         # IN: ticker, interval (aggregation), api, entries limit
+    #         # OUT: array with stock data (OHCL)
+    #
+    #     try:
+    #         if interval == '30m':
+    #             dataRaw = self.api.get_barset(ticker,'5m',limit*6).df[ticker]
+    #             data = dataRaw.resample('30m').agg({
+    #                                         'open':'first',
+    #                                         'high':'max',
+    #                                         'low':'m',
+    #                                         'close':'last',
+    #                                         'volume':'sum'
+    #                                         })
+    #             data = data.dropna()
+    #         else:
+    #             data = self.api.get_barset(ticker,interval,limit).df[ticker]
+    #     except Exception as e:
+    #         lg.error('Something happened while loading historical data')
+    #         lg.error(e)
+    #         sys.exit()
+    #
+    #     return data
 
     # def get_open_positions(self,assetId):
     #     # get open positions
@@ -150,10 +145,10 @@ class Trader:
 
         if trend == 'long' and not exit:
             side = 'buy'
-            limitPrice = currentPrice + currentPrice*gvars.maxVar
+            limitPrice = round(currentPrice + currentPrice*gvars.maxVar, 2)
         elif trend == 'short' and not exit:
             side = 'sell'
-            limitPrice = currentPrice - currentPrice*gvars.maxVar
+            limitPrice = round(currentPrice - currentPrice*gvars.maxVar, 2)
         elif trend == 'long' and exit:
             side = 'sell'
         elif trend == 'short' and exit:
@@ -331,14 +326,15 @@ class Trader:
         try:
             while True:
 
-                # ask for 30 min candles
-                data = self.load_historical_data(ticker,interval=30,limit=50)
+                # ask for 30 m candles
+                data = self.load_historical_data(ticker, interval='30m', period='5d')
+                close = data.Close.values
 
                 # calculate the EMAs
                 # closing price of stock
-                ema9 = ti.ema(data.close.to_numpy(),9)[-1]
-                ema26 = ti.ema(data.close.to_numpy(),26)[-1]
-                ema50 = ti.ema(data.close.to_numpy(),50)[-1]
+                ema9 = ti.ema(data.close,9)[-1]
+                ema26 = ti.ema(data.close,26)[-1]
+                ema50 = ti.ema(data.close,50)[-1]
 
                 lg.info('%s general trend EMAs = [EMA9:%.2f,EMA26:%.2f,EMA50:%.2f]' % (ticker,ema9,ema26,ema50))
 
@@ -373,13 +369,14 @@ class Trader:
 
         try:
             while True:
-                data = self.load_historical_data(ticker,interval=5,limit=50)
+                data = self.load_historical_data(ticker,interval='5m',period='1d')
+                close = data.Close.values
 
                 # calculate the EMAs
                 # closing price of stock
-                ema9 = ti.ema(data.close.to_numpy(),9)[-1]
-                ema26 = ti.ema(data.close.to_numpy(),26)[-1]
-                ema50 = ti.ema(data.close.to_numpy(),50)[-1]
+                ema9 = ti.ema(data.close, 9)[-1]
+                ema26 = ti.ema(data.close, 26)[-1]
+                ema50 = ti.ema(data.close, 50)[-1]
 
                 lg.info('%s instant trend EMAs = [EMA9:%.2f,EMA26:%.2f,EMA50:%.2f]' % (ticker,ema9,ema26,ema50))
 
@@ -413,11 +410,11 @@ class Trader:
 
         try:
             while True:
-                data = self.load_historical_data(ticker,interval=5,limit=15)
+                data = self.load_historical_data(ticker,interval='5m',period='1d')
 
                 # calculate the RSI
                 # closing price of stock
-                rsi = ti.rsi(data.close.to_numpy(), 14)[-1] # it uses 14-sample window
+                rsi = ti.rsi(data.Close.values, 14)[-1] # it uses 14-sample window
 
                 lg.info('%s rsi = [%.2f]' % (ticker,rsi))
 
@@ -451,11 +448,11 @@ class Trader:
 
         try:
             while True:
-                data = self.load_historical_data(ticker,interval=5,limit=50)
+                data = self.load_historical_data(ticker,interval='5m',period='1d')
 
                 # calculate the STOCHASTIC
                 # highest, lowest, closing price of stock
-                stoch_k, stoch_d = ti.stoch(data.high.to_numpy(), data.low.to_numpy(), data.close.to_numpy(), 9, 6, 9)
+                stoch_k, stoch_d = ti.stoch(data.High.values, data.Low.values, data.Close.values, 9, 6, 9)
                 stoch_k = stoch_k[-1]
                 stoch_d = stoch_d[-1]
 
@@ -488,10 +485,10 @@ class Trader:
 
         lg.info('Checking stochastic crossing...')
 
-        data = self.load_historical_data(ticker,interval=5,limit=50)
+        data = self.load_historical_data(ticker,interval='5m',period='1d')
 
         # calculate the STOCHASTIC
-        stoch_k, stoch_d = ti.stoch(data.high.to_numpy(), data.low.to_numpy(), data.close.to_numpy(), 9, 6, 9)
+        stoch_k, stoch_d = ti.stoch(data.High.values, data.Low.values, data.Close.values, 9, 6, 9)
         stoch_k = stoch_k[-1]
         stoch_d = stoch_d[-1]
 
@@ -524,7 +521,7 @@ class Trader:
         takeProfit = self.set_takeprofit(entryPrice,trend)
 
         # set the stop loss
-        stopLoss = self.set_stoploss(entryPrice,trend)
+        stop_loss = self.set_stop_loss(entryPrice,trend)
 
         try:
             while True:
@@ -544,13 +541,13 @@ class Trader:
 
                 #check if stop loss is met
                 # LONG/UP version
-                elif (trend == 'long') and (self.currentPrice <= stopLoss):
-                    lg.info('Stop loss met at %.2f. Current price is %.2f' % (stoploss,self.currentPrice))
+                elif (trend == 'long') and (self.currentPrice <= stop_loss):
+                    lg.info('Stop loss met at %.2f. Current price is %.2f' % (stop_loss,self.currentPrice))
                     return False
 
                 # SHORT/DOWN version
-                elif (trend == 'short') and (self.currentPrice >= stopLoss):
-                    lg.info('Stop loss met at %.2f. Current price is %.2f' % (stoploss,self.currentPrice))
+                elif (trend == 'short') and (self.currentPrice >= stop_loss):
+                    lg.info('Stop loss met at %.2f. Current price is %.2f' % (stop_loss,self.currentPrice))
                     return False
 
                 # check stoch crossing
@@ -561,7 +558,7 @@ class Trader:
                 # we wait
                 elif attempt <= gvars.maxAttemptsEPM:
                     lg.info('Waiting inside position, attempt #%d' % attempt)
-                    lg.info('SL %.2f <-- %.2f --> %.2f TP' % (stopLoss,self.currentPrice,takeProfit))
+                    lg.info('SL %.2f <-- %.2f --> %.2f TP' % (stop_loss,self.currentPrice,takeProfit))
                     time.sleep(gvars.sleepTimeEPM)
                     attempt += 1
 
@@ -616,7 +613,7 @@ class Trader:
                 break # get out of the loop
 
             # get current price
-            self.currentPrice = float(self.load_historical_data(ticker,interval=1,limit=1).close)
+            self.currentPrice = round(float(self.load_historical_data(ticker,interval='1m',period='1d').Close.values[-1]), 2)
 
             # decide the total amount to invest
             sharesQty = self.get_shares_amount(self.currentPrice)

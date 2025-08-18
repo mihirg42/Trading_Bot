@@ -49,7 +49,7 @@ def check_asset_ok(api,ticker):
             lg.info('Asset exists but not tradable, exiting')
             sys.exit()
     except Exception as e:
-        lg.error('Asset does not exist or something happens!')
+        lg.error('Asset does not exist or something happened!')
         lg.error(e)
         sys.exit()
 
@@ -70,8 +70,8 @@ def main():
     clean_open_orders(api)
 
     # get ticker
-    ticker = input("Write the ticker you want to operate with: ")
-    # ticker = 'AAPL'
+    # ticker = input("Write the ticker you want to operate with: ")
+    ticker = 'AAPL'
 
     check_asset_ok(api,ticker)
 
